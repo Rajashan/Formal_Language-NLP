@@ -31,6 +31,15 @@ print(device)
 import tensorboardX
 
 def trg2src(text):
+    '''[Target to text]
+    
+    Arguments:
+        text {[string]} -- [String of a target language]
+    
+    Returns:
+        output {[string]} -- [String of a source language]
+    '''
+
     output = []
     for sentence in text:
         i = ','.join(sentence)
@@ -169,13 +178,16 @@ def get_iters(cfg, depth, num_generated, num_train, num_val, num_test, batch_siz
     else:
         test = dt
         test.to_csv("test.csv", index=False)
-        test = TabularDataset.splits(path='./', test='test.csv',format='csv', fields=data_fields)
+        test = TabularDataset.splits(path='./', test='test.csv',format='csv', fields=data_fields)[0]
+
         SRC.build_vocab(test)
         TRG.build_vocab(test)
 
-        test_iter = BucketIterator.splits((test), batch_size=batch_size, device = device, shuffle=True, sort_key=lambda x: len(vars(x)))
-        return test_iter
+        test = TabularDataset.splits(path='./', test='test.csv',format='csv', fields=data_fields)
 
+
+        test_iter = BucketIterator.splits(test, batch_size=batch_size, device = device, shuffle=True, sort_key=lambda x: len(vars(x)))
+        return test_iter
     
     
 
