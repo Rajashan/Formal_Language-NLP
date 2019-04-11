@@ -1,11 +1,11 @@
-from seq2seq import encoder, decoder, Seq2Seq
+import torch
 
-def train(model, iterator, optimizer, criterion, clip):
+def trainer(model, iterator, optimizer, criterion, clip):
     model.train()
 
-    epoch.loss = 0
+    epoch_loss = 0
 
-    for batch, i in enumerate(iterator):
+    for i, batch in enumerate(iterator):
         src = batch.src
         trg = batch.trg
 
@@ -50,6 +50,8 @@ def evaluate(model, iterator, criterion):
 
             output = output[1:].view(-1, output.shape[-1])
             trg = trg[1:].view(-1)
+
+            loss = criterion(output, trg)
 
             epoch_loss += loss.item()
 

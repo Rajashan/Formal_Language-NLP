@@ -25,8 +25,7 @@ import matplotlib.pyplot as plt
 
 torch.cuda.set_device(0)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
-print(device)
+device = torch.device("cpu")
 
 import tensorboardX
 
@@ -148,6 +147,7 @@ def get_iters(cfg, depth, num_generated, num_train, num_val, num_test, batch_siz
     dt = pd.concat([pd.Series(a),pd.Series(b)], axis = 1)
     tokenize_SRC = lambda x: x.split(' ')
     tokenize_TRG = lambda x: x.split(' ')
+    
     SRC = Field(tokenize = tokenize_SRC,init_token='<sos>', eos_token='<eos>', sequential=True, use_vocab=True)
     TRG = Field(tokenize = tokenize_TRG,init_token='<sos>', eos_token='<eos>', sequential=True, use_vocab=True)
 
@@ -190,7 +190,88 @@ def get_iters(cfg, depth, num_generated, num_train, num_val, num_test, batch_siz
         return test_iter
     
     
+def get_lang(cfg, depth, num_generated, num_train, num_val, num_test, batch_size):
+    '''
+    cfg: 3-tuple [a,b,c]
+    num_generated:  
+    trg: 
+    '''
+    if np.sum(cfg) == 0:
+        print("No language selected")
+        return None
+    elif np.sum(cfg) == 1:
+        language_index = cfg.index(1)+1
 
+        pairs = generate_pairs(depth,language_index,num_generated)
+
+    elif np.sum(cfg) == 2:
+        language_index1 = cfg.index(1,0) + 1
+        language_index2 = cfg.index(1,1) + 1
+        pairs1 = generate_pairs(depth,language_index1,num_generated/2)
+        pairs2 = generate_pairs(depth,language_index2,num_generated/2)
+        pairs = pairs1 + pairs2
+
+    elif np.sum(cfg) == 3:
+        language_index1 = cfg.index(1,0)+1
+        language_index2 = cfg.index(1,1)+1
+        language_index3 = cfg.index(1,2)+1
+        pairs1 = generate_pairs(depth,language_index1,round(num_generated/3))
+        pairs2 = generate_pairs(depth,language_index2,round(num_generated/3))
+        pairs3 = generate_pairs(depth,language_index3,round(num_generated/3))
+        pairs = pairs1 + pairs2 + pairs3
+
+
+    data = choices(pairs, weights = None, k=num_train + num_val + num_test)
+
+    a,b = map(list, zip(*(s.split(" ") for s in data)))
+    a = np.transpose(a)
+    b = np.transpose(b)
+    a = [" ".join(s) for s in a]
+    b = [" ".join(s) for s in b]
+    dt = pd.concat([pd.Series(a),pd.Series(b)], axis = 1)
+    tokenize_SRC = lambda x: x.split(' ')
+    tokenize_TRG = lambda x: x.split(' ')
+    
+    SRC = Field(tokenize = tokenize_SRC,init_token='<sos>', eos_token='<eos>', sequential=True, use_vocab=True)
+    TRG = Field(tokenize = tokenize_TRG,init_token='<sos>', eos_token='<eos>', sequential=True, use_vocab=True)
+
+    df = pd.DataFrame(dt, columns=["src", "trg"])
+
+    data_fields = [('src', SRC), ('trg', TRG)]
+
+    batch_size = batch_size
+    
+    if (num_train & num_val):
+        val_size = num_val/(num_train+num_val+num_test)
+        test_size = (num_test)/(num_val+num_test)
+        train, val = train_test_split(dt, test_size= val_size)
+        val, test = train_test_split(val, test_size = test_size)
+
+        train.to_csv("train.csv", index=False)
+        val.to_csv("val.csv", index=False)
+        test.to_csv("test.csv", index=False)
+
+        train,val,test = TabularDataset.splits(path='./', train='train.csv', validation='val.csv', test='test.csv',format='csv', fields=data_fields)
+
+        SRC.build_vocab(train, val)
+        TRG.build_vocab(train, val)
+
+        train_iter, val_iter, test_iter = BucketIterator.splits((train,val,test), batch_size=batch_size, device = device, shuffle=True, sort_key=lambda x: len(vars(x)))
+        
+
+    else:
+        test = dt
+        test.to_csv("test.csv", index=False)
+        test = TabularDataset.splits(path='./', test='test.csv',format='csv', fields=data_fields)[0]
+
+        SRC.build_vocab(test)
+        TRG.build_vocab(test)
+
+        test = TabularDataset.splits(path='./', test='test.csv',format='csv', fields=data_fields)
+
+
+        test_iter = BucketIterator.splits(test, batch_size=batch_size, device = device, shuffle=True, sort_key=lambda x: len(vars(x)))
+    return SRC, TRG, train, val, test
 
     
 

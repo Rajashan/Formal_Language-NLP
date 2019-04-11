@@ -2,20 +2,19 @@ import torch
 import torch.nn as nn
 from torch import optim
 import torch.nn.functional as F
+import random
 
-
-class encoder:
+class encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, hid_dim, n_layers, dropout):
         super().__init__()
 
         self.input_dim = input_dim
         self.emb_dim = emb_dim
         self.hid_dim = hid_dim
-        self.output_dim = output_dim
         self.n_layers = n_layers
         self.dropout = dropout
 
-        self.embedding = nn.Embedding
+        self.embedding = nn.Embedding(input_dim, emb_dim)
         self.rnn = nn.LSTM(emb_dim, hid_dim, n_layers, dropout=dropout)
         
         self.dropout = nn.Dropout(dropout)
@@ -24,7 +23,7 @@ class encoder:
 
         #src = [len(src sentence), batch_size]
 
-        embedded = self.dropout(self.embedding(input))
+        embedded = self.dropout(self.embedding(src))
         #embedded = [len(src sentence), batch_size, emb_dim]
 
         output, (hidden, cell) = self.rnn(embedded)
@@ -36,7 +35,7 @@ class encoder:
         return hidden, cell
 
 
-class decoder:
+class decoder(nn.Module):
     def __init__(self, output_dim, emb_dim, hid_dim, n_layers, dropout):
         super().__init__()
 
@@ -77,7 +76,7 @@ class decoder:
 
         return prediction, hidden, cell
 
-class Seq2Seq(nn.Module):
+class seq2seq(nn.Module):
     def __init__(self, encoder, decoder, device):
         super().__init__()
 
@@ -90,29 +89,29 @@ class Seq2Seq(nn.Module):
         assert encoder.n_layers == decoder.n_layers, \
             "Encoder and decoder must have equal number of layers."
 
-        def forward(self, src, trg, teacher_forcing_ratio = 0.5):
-            #src = [len(src sentence), batch_size]
-            #trg = [len(trg sentence), batch_size]
+    def forward(self, src, trg, teacher_forcing_ratio = 0.5):
+        #src = [len(src sentence), batch_size]
+        #trg = [len(trg sentence), batch_size]
 
-            batch_size = trg.shape(1)
-            max_len = trg.shape(0)
+        batch_size = trg.shape[1]
+        max_len = trg.shape[0]
 
-            trg_vocab_size = self.decoder.output_dim
+        trg_vocab_size = self.decoder.output_dim
 
-            outputs = torch.zeros(max_len, batch_size, trg_vocab_size).to(self.device)
+        outputs = torch.zeros(max_len, batch_size, trg_vocab_size).to(self.device)
             
-            hidden, cell = self.encoder(src)
+        hidden, cell = self.encoder(src)
 
-            input = trg[0,:]
+        input = trg[0,:]
 
-            for t in range(1, max_len):
-                output, (hidden, cell) = self.decoder(input, hidden, cell)
-                outputs[t] = output
-                teacher_force = random.random() < teacher_forcing_ratio
-                top = output.max(1)[1]
-                input = (trg[t] if teacher_force else top1)
+        for t in range(1, max_len):
+            output, hidden, cell = self.decoder(input, hidden, cell)
+            outputs[t] = output
+            teacher_force = random.random() < teacher_forcing_ratio
+            top = output.max(1)[1]
+            input = (trg[t] if teacher_force else top)
 
-            return outputs
+        return outputs
 
 
 
