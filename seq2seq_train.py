@@ -5,6 +5,7 @@ import os
 
 
 def trainer(model, iterator, optimizer, criterion, clip):
+
     model.train()
 
     epoch_loss = 0
@@ -62,13 +63,13 @@ def evaluate(model, iterator, criterion):
             for j in range(len(trg_out[1,:])):
                 
                 with open('seq2seq_trg.csv', 'a') as file1:
-                    file1.write(pd.DataFrame(trg_out[:,j].numpy()).T.to_string(index = False, header = False))
+                    file1.write(pd.DataFrame(trg_out[:,j].cpu().numpy()).T.to_string(index = False, header = False))
                     file1.write(",")
                     #print(trg_out[:,j].numpy())
                     file1.close()
                 #pd.DataFrame(trg_out[:,i].numpy()).to_csv("seq2seq_trg.csv", header=None, index=None)
                 with open('seq2seq_output.csv', 'a') as file2:
-                    file2.write(pd.DataFrame(output_out[:,j].numpy()).T.to_string(index = False, header = False))
+                    file2.write(pd.DataFrame(output_out[:,j].cpu().numpy()).T.to_string(index = False, header = False))
                     file2.write(",")
                     file2.close()
             
