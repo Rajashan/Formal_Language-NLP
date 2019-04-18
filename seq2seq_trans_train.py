@@ -4,7 +4,7 @@ import csv
 import os
 
 
-def train(model, iterator, optimizer, criterion, clip):
+def trainer(model, iterator, optimizer, criterion, clip):
     
     model.train()
     

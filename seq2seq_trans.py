@@ -1,3 +1,10 @@
+import torch
+import torch.nn as nn
+from torch import optim
+import torch.nn.functional as F
+import random
+import numpy as np  
+
 class encoder(nn.Module):
     def __init__(self, input_dim, hid_dim, n_layers, n_heads, pf_dim, encoder_layer, self_attention, positionwise_feedforward, dropout, device):
         super().__init__()
@@ -154,7 +161,7 @@ class PositionwiseFeedforward(nn.Module):
         
         return x
 
-class Decoder(nn.Module):
+class decoder(nn.Module):
     def __init__(self, output_dim, hid_dim, n_layers, n_heads, pf_dim, decoder_layer, self_attention, positionwise_feedforward, dropout, device):
         super().__init__()
         
@@ -223,7 +230,7 @@ class DecoderLayer(nn.Module):
         
         return trg
 
-class Seq2Seq(nn.Module):
+class seq2seq(nn.Module):
     def __init__(self, encoder, decoder, pad_idx, device):
         super().__init__()
         
