@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
+from torch import optim
 import torch.nn.functional as F
+import random
+import numpy as np  
 
 class encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout):
@@ -14,8 +16,8 @@ class encoder(nn.Module):
         self.dropout = dropout
 
         self.embedding = nn.Embedding(input_dim, emb_dim)
-        self.rnn = nn.LSTM(emb_dim,enc_hid_dim, dropout = dropout)
-        self.fc = nn.Linear(enc_hid_dim,dec_hid_dim)
+        self.rnn = nn.GRU(emb_dim,enc_hid_dim,bidirectional = True)
+        self.fc = nn.Linear(enc_hid_dim * 2,dec_hid_dim)
 
         self.dropout = nn.Dropout(dropout)
     
@@ -70,7 +72,7 @@ class attention(nn.Module):
         #encoder_outputs = [batch_size, len(src sentence), enc_hid_dim * 2]
 
         energy = torch.tanh(self.attn(torch.cat((hidden, encoder_outputs), dim=2)))
-
+        energy = energy.permute(0, 2, 1)
         #energy = [batch_size, dec_hid_dim, len(src sentence)]
         #v = [dec_hid_dim]
 
@@ -79,8 +81,6 @@ class attention(nn.Module):
 
         attention = torch.bmm(v, energy).squeeze(1)
         #attention = [batch_size, len(src sentence)]
-
-        
 
         attention = attention.masked_fill(mask == 0, -1e10)
 
@@ -143,6 +143,8 @@ class decoder(nn.Module):
         weighted = weighted.squeeze(0)
         output = self.out(torch.cat((output, weighted, embedded), dim=1))
         #output = [batch_size, output_dim]
+
+        return output, hidden.squeeze(0), a.squeeze(1)
 
 class seq2seq(nn.Module):
     def __init__(self, encoder, decoder,pad_idx, sos_idx, eos_idx, device):

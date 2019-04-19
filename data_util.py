@@ -3,6 +3,7 @@ import random
 import math
 import os
 import time
+import csv
 # for data
 import numpy as np
 import pandas as pd
@@ -136,8 +137,11 @@ def get_iters(cfg, depth, num_generated, num_train, num_val, num_test, batch_siz
         pairs3 = generate_pairs(depth,language_index3,round(num_generated/3))
         pairs = pairs1 + pairs2 + pairs3
 
-
-    data = choices(pairs, weights = None, k=num_train + num_val + num_test)
+    data_set = list(set(pairs))
+    data_set.sort(key = lambda s: len(s))
+    data_len = [len(s) for s in data_set]
+    
+    data = choices(data_set, weights = None, k=num_train + num_val + num_test)
 
     a,b = map(list, zip(*(s.split(" ") for s in data)))
     a = np.transpose(a)
@@ -148,8 +152,8 @@ def get_iters(cfg, depth, num_generated, num_train, num_val, num_test, batch_siz
     tokenize_SRC = lambda x: x.split(' ')
     tokenize_TRG = lambda x: x.split(' ')
     
-    SRC = Field(tokenize = tokenize_SRC,init_token='<sos>', eos_token='<eos>', sequential=True, use_vocab=True)
-    TRG = Field(tokenize = tokenize_TRG,init_token='<sos>', eos_token='<eos>', sequential=True, use_vocab=True)
+    SRC = Field(tokenize = tokenize_SRC,init_token='<sos>', eos_token='<eos>')
+    TRG = Field(tokenize = tokenize_TRG,init_token='<sos>', eos_token='<eos>')
 
     df = pd.DataFrame(dt, columns=["src", "trg"])
 
@@ -220,8 +224,11 @@ def get_iters_att(cfg, depth, num_generated, num_train, num_val, num_test, batch
         pairs3 = generate_pairs(depth,language_index3,round(num_generated/3))
         pairs = pairs1 + pairs2 + pairs3
 
-
-    data = choices(pairs, weights = None, k=num_train + num_val + num_test)
+    data_set = list(set(pairs))
+    data_set.sort(key = lambda s: len(s))
+    data_len = [len(s) for s in data_set]
+    
+    data = choices(data_set, weights = None, k=num_train + num_val + num_test)
 
     a,b = map(list, zip(*(s.split(" ") for s in data)))
     a = np.transpose(a)
@@ -305,7 +312,11 @@ def get_iters_trans(cfg, depth, num_generated, num_train, num_val, num_test, bat
         pairs = pairs1 + pairs2 + pairs3
 
 
-    data = choices(pairs, weights = None, k=num_train + num_val + num_test)
+    data_set = list(set(pairs))
+    data_set.sort(key = lambda s: len(s))
+    data_len = [len(s) for s in data_set]
+    
+    data = choices(data_set, weights = None, k=num_train + num_val + num_test)
 
     a,b = map(list, zip(*(s.split(" ") for s in data)))
     a = np.transpose(a)
@@ -358,12 +369,35 @@ def get_iters_trans(cfg, depth, num_generated, num_train, num_val, num_test, bat
         return test_iter
    
 
-def decode_greedy(output,TRG):
-    greed = []
+def exact_match(output,trg):
+    '''Calculates fractino of exact matches.
+    
+    Arguments:
+        output {csv} -- Output from network after decoding
+        trg {csv} -- target for supervised learning
+   
+    Returns:
+        float -- fraction of exact matches. 
+    '''
+
     
 
+    match = 0
 
-    return translation
+    for row in output:
+        if output[row] == trg[row]:
+            match += 1
+        else:
+            None
+    return match/sum(1 for row in output) 
+
+
+def LCS_match(output,trg):
+    None
+
+
+    
+
 
 
 

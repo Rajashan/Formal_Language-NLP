@@ -1,4 +1,4 @@
-from data_util import get_lang, get_iters, decode_greedy
+from data_util import get_iters
 from util import init_weights
 from seq2seq import encoder, decoder, seq2seq
 import numpy as np
@@ -17,7 +17,7 @@ import pandas as pd
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device('cpu')
 print(device)
-SRC, TRG, train, val, test = get_lang([1,0,0],10, 100, 5000, 2000, 1000, 128)
+
 train_iter, val_iter, test_iter, train, val, test, SRC, TRG = get_iters([1,0,0],5, 100, 5000, 2000, 1000, 128)
 
 print(f"Number of training examples: {len(train.examples)}")
@@ -25,8 +25,8 @@ print(f"Number of validation examples: {len(val.examples)}")
 print(f"Number of testing examples: {len(test.examples)}")
 print(vars(train.examples[5]))
 
-SRC.build_vocab(train,val)
-TRG.build_vocab(train,val)
+#SRC.build_vocab(train,val)
+#TRG.build_vocab(train,val)
 
 print(f"Unique tokens in source (SRC) vocabulary: {len(SRC.vocab)}")
 print(f"Unique tokens in target (TRG) vocabulary: {len(TRG.vocab)}")
@@ -98,9 +98,8 @@ model.load_state_dict(torch.load('seq2seq-model.pt'))
 
 test_loss = evaluate(model, test_iter, criterion)
 
-#trg_test = pd.read_csv('seq2seq_trg.csv')
-#output_test = pd.read_csv('seq2seq_output.csv')
-
+trg_test = pd.read_csv('seq2seq_trg.csv')
+output_test = pd.read_csv('seq2seq_output.csv')
 
 
 
