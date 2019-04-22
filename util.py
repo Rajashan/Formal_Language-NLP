@@ -15,6 +15,7 @@ def init_weights(m):
         nn.init.uniform_(param.data, -0.08, 0.08)
 
 
+
 class Opt:
     "Optim wrapper that implements rate."
     def __init__(self, model_size, factor, warmup, optimizer):
@@ -41,3 +42,37 @@ class Opt:
         return self.factor * \
             (self.model_size ** (-0.5) *
             min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+
+def translate_sentence(model, sentence):
+    model.eval()
+    tokenized = tokenize_de(sentence) 
+    tokenized = ['<sos>'] + [t.lower() for t in tokenized] + ['<eos>']
+    numericalized = [SRC.vocab.stoi[t] for t in tokenized] 
+    sentence_length = torch.LongTensor([len(numericalized)]).to(device) 
+    tensor = torch.LongTensor(numericalized).unsqueeze(1).to(device) 
+    translation_tensor_logits, attention = model(tensor, sentence_length, None, 0) 
+    translation_tensor = torch.argmax(translation_tensor_logits.squeeze(1), 1)
+    translation = [TRG.vocab.itos[t] for t in translation_tensor]
+    translation, attention = translation[1:], attention[1:]
+    return translation, attention
+
+def display_attention(candidate, translation, attention):
+    
+    fig = plt.figure(figsize=(10,10))
+    ax = fig.add_subplot(111)
+    
+    attention = attention.squeeze(1).cpu().detach().numpy()
+    
+    cax = ax.matshow(attention, cmap='bone')
+   
+    ax.tick_params(labelsize=15)
+    ax.set_xticklabels([''] + ['<sos>'] + [t.lower() for t in tokenize_de(candidate)] + ['<eos>'], 
+                       rotation=45)
+    ax.set_yticklabels([''] + translation)
+
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+
+    plt.show()
+    plt.close()
