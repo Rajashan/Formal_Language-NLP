@@ -1,4 +1,4 @@
-from data_util import get_iters_att_new
+from data_util import get_iters_att
 from util import init_weights
 from seq2seq_att import encoder, decoder, seq2seq, attention
 import numpy as np
@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import time
 from seq2seq_att_train import trainer, evaluate
 import random
-from util import epoch_time, translate_sentence, display_attention
+from util import epoch_time
 import math
 import pandas as pd
 import os
@@ -19,7 +19,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device('cpu')
 print(device)
 
-train_iter, val_iter, test_iter, train, val, test, SRC, TRG = get_iters_att_new([1,0,0],[1,0,0],10,10, 5000, 2000, 1000, 128)
+train_iter, val_iter, test_iter, train, val, test, SRC, TRG = get_iters_att([1,0,0],10, 100000, 5000, 2000, 1000, 128)
 
 print(f"Number of training examples: {len(train.examples)}")
 print(f"Number of validation examples: {len(val.examples)}")
@@ -34,11 +34,10 @@ print(f"Unique tokens in target (TRG) vocabulary: {len(TRG.vocab)}")
 
 INPUT_DIM = len(SRC.vocab)
 OUTPUT_DIM = len(TRG.vocab)
-ENC_EMB_DIM = 10
-DEC_EMB_DIM = 10
-ENC_HID_DIM = 32
-DEC_HID_DIM = 32
-N_LAYERS = 1
+ENC_EMB_DIM = 32
+DEC_EMB_DIM = 32
+ENC_HID_DIM = 64
+DEC_HID_DIM = 64
 ENC_DROPOUT = 0.2
 DEC_DROPOUT = 0.2
 PAD_IDX = SRC.vocab.stoi['<pad>']
@@ -46,8 +45,8 @@ SOS_IDX = TRG.vocab.stoi['<sos>']
 EOS_IDX = TRG.vocab.stoi['<eos>']
 
 attn = attention(ENC_HID_DIM, DEC_HID_DIM)
-enc = encoder(INPUT_DIM, ENC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM,N_LAYERS, ENC_DROPOUT)
-dec = decoder(OUTPUT_DIM, DEC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM,N_LAYERS, DEC_DROPOUT, attn)
+enc = encoder(INPUT_DIM, ENC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, ENC_DROPOUT)
+dec = decoder(OUTPUT_DIM, DEC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, DEC_DROPOUT, attn)
 
 model = seq2seq(enc, dec, PAD_IDX, SOS_IDX, EOS_IDX, device).to(device)
 print(model)
@@ -94,14 +93,3 @@ ax2.plot(epoch_axis, np.asarray(np.exp(train_total)).squeeze(), 'r', epoch_axis,
 
 ax1.legend(['Train Loss','Validation Loss'])
 ax2.legend(['Train PPL','Validation PPL'])
-
-plt.show()
-
-model.load_state_dict(torch.load(MODEL_SAVE_PATH))
-
-test_loss = evaluate(model, test_iter, criterion)
-
-print(f'| Test Loss: {test_loss:.3f} | Test PPL: {math.exp(test_loss):7.3f} |')
-
-
-

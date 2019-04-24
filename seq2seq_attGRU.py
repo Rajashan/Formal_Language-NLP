@@ -6,20 +6,19 @@ import random
 import numpy as np  
 
 class encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, n_layers, dropout):
+    def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout):
         super().__init__()
 
         self.input_dim = input_dim
         self.emb_dim = emb_dim
         self.enc_hid_dim = enc_hid_dim
         self.dec_hid_dim = dec_hid_dim
-        self.n_layers = n_layers
         self.dropout = dropout
 
         self.embedding = nn.Embedding(input_dim, emb_dim)
-        self.rnn = nn.LSTM(emb_dim,enc_hid_dim,n_layers, dropout = dropout)
-        #self.fc = nn.Linear(enc_hid_dim * 2, dec_hid_dim)
-        self.fc = nn.Linear(enc_hid_dim*n_layers, dec_hid_dim)
+        self.rnn = nn.GRU(emb_dim,enc_hid_dim,bidirectional = True)
+        self.fc = nn.Linear(enc_hid_dim * 2,dec_hid_dim)
+
         self.dropout = nn.Dropout(dropout)
     
     def forward(self,src, src_len):
@@ -34,31 +33,28 @@ class encoder(nn.Module):
         packed_outputs, hidden = self.rnn(packed_embedded)
 
         outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_outputs) 
-        
         #outputs = [len(sentence), batch_size, hid_dim * num_directions]
         #hidden = [n_layers * num_directions, batch_size, hid_dim]
 
         #if bidirectional, hidden is stacked [forward_1, backward_1, forward_2, backward_2, ...]
         #outputs are always from the last layer
         #hidden [-2, :, : ] is the last of the forwards RNN 
-        #hidden [-1, :, : ] is the last of the backwards RNN g
-        
-        #hidden = torch.tanh(self.fc(torch.cat((hidden[0,:,:], hidden[1,:,:]), dim = 1)))
+        #hidden [-1, :, : ] is the last of the backwards RNN
+
+        hidden = torch.tanh(self.fc(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1)))
         #outputs = [len(sentence), batch_size, enc_hid_dim * 2]
         #hidden = [batch_size, dec_hid_dim]
-        hidden, cell = hidden[0].squeeze(0), hidden[1].squeeze(0)
-        
-        
-        return outputs, hidden, cell
+
+        return outputs, hidden
 
 class attention(nn.Module):
-    def __init__(self, enc_hid_dim, dec_hid_dim,):
+    def __init__(self, enc_hid_dim, dec_hid_dim):
         super().__init__()
 
         self.enc_hid_dim = enc_hid_dim
         self.dec_hid_dim = dec_hid_dim
-        # remember bidirectional
-        self.attn = nn.Linear((enc_hid_dim ) + dec_hid_dim, dec_hid_dim)
+
+        self.attn = nn.Linear((enc_hid_dim * 2) + dec_hid_dim, dec_hid_dim)
         self.v = nn.Parameter(torch.rand(dec_hid_dim))
 
     def forward(self, hidden, encoder_outputs, mask):
@@ -69,14 +65,12 @@ class attention(nn.Module):
         batch_size = encoder_outputs.shape[1]
         src_len = encoder_outputs.shape[0]
 
-        
-        
         hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
         encoder_outputs = encoder_outputs.permute(1, 0, 2)
 
         #hidden = [batch_size, len(src sentence), dec_hid_dim]
         #encoder_outputs = [batch_size, len(src sentence), enc_hid_dim * 2]
-        
+
         energy = torch.tanh(self.attn(torch.cat((hidden, encoder_outputs), dim=2)))
         energy = energy.permute(0, 2, 1)
         #energy = [batch_size, dec_hid_dim, len(src sentence)]
@@ -93,23 +87,22 @@ class attention(nn.Module):
         return F.softmax(attention, dim=1)
 
 class decoder(nn.Module):
-    def __init__(self, output_dim, emb_dim, enc_hid_dim, dec_hid_dim,n_layers, dropout, attention):
+    def __init__(self, output_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout, attention):
         super().__init__()
 
         self.emb_dim = emb_dim
         self.enc_hid_dim = enc_hid_dim
         self.dec_hid_dim = dec_hid_dim
         self.output_dim = output_dim
-        self.n_layers = n_layers
         self.dropout = dropout
         self.attention = attention
         
         self.embedding = nn.Embedding(output_dim, emb_dim)
-        self.rnn = nn.LSTM((enc_hid_dim ) + emb_dim, dec_hid_dim,n_layers, dropout = dropout)
-        self.out = nn.Linear((enc_hid_dim ) + dec_hid_dim + emb_dim, output_dim)
+        self.rnn = nn.GRU((enc_hid_dim * 2) + emb_dim, dec_hid_dim)
+        self.out = nn.Linear((enc_hid_dim * 2) + dec_hid_dim + emb_dim, output_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, input, hidden,cell, encoder_outputs, mask):
+    def forward(self, input, hidden, encoder_outputs, mask):
         #input = [batch_size]
         #hidden = [batch_size, dec_hid_dim]
         #encoder_outputs = [len(src sentence), batch_size, enc_hid_dim * 2]
@@ -138,9 +131,8 @@ class decoder(nn.Module):
 
         rnn_input = torch.cat((embedded, weighted), dim=2)
         #rnn_input = [1, batch_size, (enc_hid_dim * 2) + emb_dim]
-        
-        output, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0),cell.unsqueeze(0)))
-        
+
+        output, hidden = self.rnn(rnn_input, hidden.unsqueeze(0))
         #output = [len(sentence), batch_size, dec_hid_dim * n_directions]
         #hidden = [n_layers * n_directions, batch_size, dec_hid_dim]
 
@@ -189,14 +181,14 @@ class seq2seq(nn.Module):
 
         attentions = torch.zeros(max_len, batch_size, src.shape[0]).to(self.device)
 
-        encoder_outputs, hidden, cell = self.encoder(src, src_len)
+        encoder_outputs, hidden = self.encoder(src, src_len)
 
         output = trg[0,:]
         mask = self.create_mask(src)
         #mask = [batch_size, len(src sentence)]
-        
+
         for t in range(1, max_len):
-            output, hidden, attention = self.decoder(output,hidden,cell, encoder_outputs, mask)
+            output, hidden, attention = self.decoder(output, hidden, encoder_outputs, mask)
             outputs[t] = output
             attentions[t] = attention
             teacher_force = random.random() < teacher_forcing_ratio
@@ -206,4 +198,3 @@ class seq2seq(nn.Module):
                 return outputs[:t], attentions[:t]
             
         return outputs, attentions
-
